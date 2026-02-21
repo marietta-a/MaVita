@@ -1,150 +1,147 @@
+import { 
+  UserProfile, 
+  MealAnalysis, 
+  Recipe, 
+  HealthGoal,
+  RecipeRequest,
+  BioReportRequest
+} from "../../types";
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { HealthGoal, MealAnalysis, Recipe, UserProfile } from "../../types";
+const API_BASE_URL = process.env.API_BASE_URL;
 
-// Always use the process.env.API_KEY directly for initialization
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const analyzeMealImage = async (base64Image: string, mimeType: string, profile: UserProfile): Promise<MealAnalysis> => {
-  const model = 'gemini-3-flash-preview';
-  
-  const prompt = `
-    ACT AS: Clinical Bio-Nutritional Scientist.
-    CONTEXT: User goals: ${profile.goals.join(', ')}.
-    
-    TASK: Analyze meal image for biological impact.
-    
-    STRICT RULES:
-    1. Be concise. Accuracy is critical.
-    2. Only identify nutrients verified in identified ingredients.
-    3. If not food, set isFood to false.
-    
-    DATA SCHEMA:
-    1. isFood: Boolean.
-    2. foodName: Clear ID.
-    3. glycemicScore: 1-10.
-    4. iIndexScore: 0-100 (Inflammation).
-    5. description: 1-sentence metabolic summary.
-    6. portionAnalysis: Macro balance.
-    7. macronutrients: Gram estimates (Protein, Carbs, Fats, Fiber).
-    8. biologicalPathways: Mechanistic tags (e.g., Sirtuin, GLP-1).
-    9. pairingSuggestions: Science-backed improvements.
-    10. nutrients: 2-3 key micros + benefits.
-    11. goalAlignment: Link to ${profile.goals[0]}.
-    12. healthRisks: Mandatory metabolic triggers (High sodium, trans fats, etc).
-  `;
-
-  const response = await ai.models.generateContent({
-    model,
-    contents: {
-      parts: [
-        { inlineData: { data: base64Image, mimeType: mimeType } },
-        { text: prompt }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          isFood: { type: Type.BOOLEAN },
-          foodName: { type: Type.STRING },
-          description: { type: Type.STRING },
-          glycemicScore: { type: Type.NUMBER },
-          iIndexScore: { type: Type.NUMBER },
-          portionAnalysis: { type: Type.STRING },
-          macronutrients: {
-            type: Type.OBJECT,
-            properties: {
-              protein: { type: Type.STRING },
-              carbs: { type: Type.STRING },
-              fats: { type: Type.STRING },
-              fiber: { type: Type.STRING }
-            }
-          },
-          biologicalPathways: { type: Type.ARRAY, items: { type: Type.STRING } },
-          pairingSuggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-          nutrients: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                benefit: { type: Type.STRING }
-              }
-            }
-          },
-          goalAlignment: { type: Type.STRING },
-          healthRisks: { type: Type.STRING }
-        },
-        required: ["isFood", "foodName", "description", "glycemicScore", "iIndexScore", "portionAnalysis", "macronutrients", "biologicalPathways", "pairingSuggestions", "nutrients", "goalAlignment", "healthRisks"]
-      }
-    }
-  });
-
-  const rawText = response.text?.trim();
-  if (!rawText) {
-    throw new Error("No response received from analysis. Please try again.");
+/**
+ * Converts a Base64 string to a binary Blob for FormData upload.
+ */
+const base64ToBlob = (base64: string, mimeType: string): Blob => {
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
   }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
+
+/**
+ * Endpoint: POST /analyze-meal
+ * Sends image as multipart/form-data and profile as JSON string field.
+ */
+export const analyzeMealImage = async (
+  base64Image: string, 
+  mimeType: string, 
+  profile: UserProfile
+): Promise<MealAnalysis> => {
   try {
-    const data = JSON.parse(rawText);
+    const formData = new FormData();
+    
+    // 1. Convert Base64 image back to Blob
+    const imageBlob = base64ToBlob(base64Image, mimeType);
+    formData.append('file', imageBlob, 'meal_scan.jpg');
+
+    // 2. Prepare Profile JSON
+    formData.append('profile', JSON.stringify(profile));
+
+    const response = await fetch(`${API_BASE_URL}/analyze-meal`, {
+      method: 'POST',
+      body: formData, 
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    // Map response to frontend MealAnalysis model
     return {
       ...data,
-      id: crypto.randomUUID(),
-      timestamp: Date.now()
+      id: data.id || crypto.randomUUID(),
+      timestamp: data.timestamp || Date.now(),
+      imageUrl: `data:${mimeType};base64,${base64Image}` 
     };
-  } catch (e) {
-    console.error("Clinical Interpretation Error:", rawText);
-    throw new Error("Precision mismatch. Please capture a clearer, well-lit image.");
+
+  } catch (error) {
+    console.error("Meal Analysis Service Error:", error);
+    throw new Error("Failed to analyze meal. Please check your connection and try again.");
   }
 };
 
+/**
+ * Endpoint: POST /generate-recipes
+ */
 export const generateLongevityPlate = async (goal: HealthGoal, cuisine: string): Promise<Recipe[]> => {
-  const model = 'gemini-3-flash-preview';
-  const prompt = `As a Medical Nutritionist, generate 3 clinical recipes for "${goal}" in "${cuisine}" style. Focus on metabolic synergy and biological longevity.`;
+  try {
+    const payload: RecipeRequest = {
+      goal: goal.toString(),
+      cuisine: cuisine
+    };
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-            instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            biologicalBenefits: { type: Type.STRING }
-          },
-          required: ["title", "ingredients", "instructions", "biologicalBenefits"]
-        }
-      }
+    const response = await fetch(`${API_BASE_URL}/generate-recipes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Recipe Generation Error: ${response.statusText}`);
     }
-  });
 
-  const rawText = response.text?.trim();
-  if (!rawText) {
-    throw new Error("No response received from recipe generation. Please try again.");
+    return await response.json();
+  } catch (error) {
+    console.error("Recipe Service Error:", error);
+    throw error;
   }
-  return JSON.parse(rawText);
 };
 
+/**
+ * Endpoint: POST /generate-report
+ */
 export const generateBioReport = async (meals: MealAnalysis[], profile: UserProfile): Promise<string> => {
-  const model = 'gemini-3-flash-preview';
-  const historyText = meals.slice(0, 10).map(m => `- ${m.foodName}: Glycemic ${m.glycemicScore}, Inflammatory ${m.iIndexScore}`).join('\n');
-  
-  const prompt = `Generate a Clinical Metabolic Report for ${profile.name} (Age: ${profile.age}) based on these recent meals:\n${historyText}\nProvide actionable healthspan advice based on their goals: ${profile.goals.join(', ')}.`;
+  try {
+    // Note: We must manually map the complex MealAnalysis array to the backend's expected structure
+    const mealsForApi = meals.map(meal => ({
+        id: meal.id,
+        timestamp: meal.timestamp,
+        isFood: meal.isFood,
+        foodName: meal.foodName,
+        description: meal.description,
+        glycemicScore: meal.glycemicScore,
+        iIndexScore: meal.iIndexScore,
+        portionAnalysis: meal.portionAnalysis,
+        macronutrients: meal.macronutrients,
+        biologicalPathways: meal.biologicalPathways,
+        pairingSuggestions: meal.pairingSuggestions,
+        nutrients: meal.nutrients,
+        goalAlignment: meal.goalAlignment,
+        healthRisks: meal.healthRisks,
+    }));
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt
-  });
 
-  const rawText = response.text?.trim();
-  if (!rawText) {
-    throw new Error("No response received from recipe generation. Please try again.");
+    const payload: BioReportRequest = {
+      meals: mealsForApi as MealAnalysis[], // Type assertion required for structure match
+      profile: profile
+    };
+
+    const response = await fetch(`${API_BASE_URL}/generate-report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Report Generation Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.report;
+  } catch (error) {
+    console.error("Report Service Error:", error);
+    throw error;
   }
-  return JSON.parse(rawText);
 };
