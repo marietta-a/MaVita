@@ -1,0 +1,7 @@
+{
+  "name": "MaVita",
+  "description": "A proactive healthcare engine powered by nutritional AI that analyzes food at a metabolic level to optimize healthspan and prevent chronic illness.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
