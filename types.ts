@@ -62,3 +62,13 @@ export interface Recipe {
   instructions: string[];
   biologicalBenefits: string;
 }
+
+export interface RecipeRequest {
+  goal: string;
+  cuisine: string;
+}
+
+export interface BioReportRequest {
+  meals: MealAnalysis[];
+  profile: UserProfile; 
+}
