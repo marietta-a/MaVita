@@ -78,7 +78,7 @@ export const generateLongevityPlate = async (goal: HealthGoal, cuisine: string):
       cuisine: cuisine
     };
 
-    const response = await fetch(`${API_BASE_URL}/generate-recipes`, {
+    const response = await fetch(`${API_BASE_URL}/generate-longevity-plate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -87,6 +87,8 @@ export const generateLongevityPlate = async (goal: HealthGoal, cuisine: string):
     });
 
     if (!response.ok) {
+      console.error(`API Error ${response.status}: ${await response.text()}`);
+      console.log(`API Endpoint ${API_BASE_URL}`);
       throw new Error(`Recipe Generation Error: ${response.statusText}`);
     }
 
