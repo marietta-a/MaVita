@@ -54,5 +54,14 @@ export function buildReport(obj: Record<string, unknown>): string {
     }
   }
 
+  // Add Date Generated
+  const dateGenerated = new Date().toLocaleString();
+  report += `\n=== META INFORMATION ===\n`;
+  report += `Date Generated: ${dateGenerated}\n`;
+
+  // Add Disclaimer
+  report += `\n=== DISCLAIMER ===\n`;
+  report += `This report is auto-generated from available data. It is intended for informational purposes only and should not be considered a substitute for professional medical, nutritional, or clinical advice.\n`;
+
   return report;
 }
