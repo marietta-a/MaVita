@@ -1,10 +1,11 @@
-
 import React, { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MealAnalysis, UserProfile } from '../../types';
 import { Activity, Flame, Droplets, Info, Camera, ShieldAlert, ChevronRight, Share2, Loader2, X, Clipboard, Check, FileText } from 'lucide-react';
 import MealDetailView from './MealDetailView';
 import { generateBioReport } from '../services/gemini';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -59,18 +60,33 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleShare = async () => {
+ const handleShare = async () => {
     if (!cachedReport) return;
-    if (navigator.share) {
+    
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Share.share({
+          title: 'MaVita Metabolic Bio-Report',
+          text: cachedReport,
+          dialogTitle: 'Share My MaVita Report'
+        });
+      } catch (err) {
+        console.warn('Capacitor Share failed or was cancelled. Falling back to clipboard.', err);
+        handleCopyToClipboard();
+      }
+    } else if (navigator.share) {
+      // Web Share API (Available on some mobile browsers)
       try {
         await navigator.share({
           title: 'MaVita Metabolic Bio-Report',
           text: cachedReport,
         });
       } catch (err) {
-        console.log('Share failed or cancelled', err);
+        console.log('Web Share API failed or cancelled. Falling back to clipboard.', err);
+        handleCopyToClipboard();
       }
     } else {
+      // Fallback for desktop browsers
       handleCopyToClipboard();
     }
   };
@@ -302,6 +318,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
 
       {selectedMeal && (
         <MealDetailView 
