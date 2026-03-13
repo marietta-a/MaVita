@@ -1,3 +1,4 @@
+import { json } from "stream/consumers";
 import { 
   UserProfile, 
   MealAnalysis, 
@@ -6,6 +7,7 @@ import {
   RecipeRequest,
   BioReportRequest
 } from "../../types";
+import { buildReport } from "../helpers/reportBuilder";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
@@ -139,9 +141,10 @@ export const generateBioReport = async (meals: MealAnalysis[], profile: UserProf
     if (!response.ok) {
       throw new Error(`Report Generation Error: ${response.statusText}`);
     }
-
     const data = await response.json();
-    return data.report;
+    const report = buildReport(data.report);
+
+    return report;
   } catch (error) {
     console.error("Report Service Error:", error);
     throw error;
