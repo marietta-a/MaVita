@@ -1,8 +1,11 @@
-
 import React, { useState, useRef } from 'react';
-import { Camera, AlertCircle, ArrowRight, Activity, Utensils, ShieldCheck } from 'lucide-react';
+import { Camera as CameraIcon, AlertCircle, ArrowRight, Activity, Utensils, ShieldCheck, Image as ImageIcon } from 'lucide-react';
 import { analyzeMealImage } from '../services/gemini';
 import { MealAnalysis, UserProfile } from '../../types';
+
+// 1. Import Capacitor Camera
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 
 interface MealAnalyzerProps {
   profile: UserProfile;
@@ -10,43 +13,54 @@ interface MealAnalyzerProps {
 }
 
 const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete }) => {
-  const [mode, setMode] = useState<'idle' | 'camera' | 'analyzing' | 'result'>('idle');
+  const [mode, setMode] = useState<'idle' | 'analyzing' | 'result'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('Initializing Bio-Engine...');
   
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   const statusMessages = [
     'Isolating Molecular Compounds...',
     'Quantifying Glycemic Impact...',
-    'Cross-Referencing Biological History...',
     'Mapping Inflammatory Pathways...',
     'Sequencing Nutrient Density...',
     'Finalizing Clinical Data...'
   ];
 
-  const startCamera = async () => {
+  /**
+   * NATIVE CAMERA CAPTURE
+   * Replaces the old startCamera (getUserMedia) logic
+   */
+  const startNativeCapture = async () => {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1080 } },
-        audio: false 
+      
+      const image = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera, // Force native camera
+        saveToGallery: false
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+
+      if (image.base64String) {
+        const fullDataUrl = `data:image/${image.format};base64,${image.base64String}`;
+        await runAnalysisCycle(fullDataUrl);
       }
-      setMode('camera');
-    } catch (err) {
-      setError("Camera access required for real-time Bio-Scanning.");
+    } catch (err: any) {
+      // Handle user cancellation or permission denial
+      if (err.message !== "User cancelled photos app") {
+        setError("Camera access required for Bio-Scanning. Please check app permissions.");
+      }
     }
   };
 
+  /**
+   * IMAGE OPTIMIZATION
+   * Ensures the payload is small enough for fast transmission over mobile networks
+   */
   const optimizeImage = (base64: string, maxWidth = 768): Promise<{data: string, url: string}> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -64,7 +78,6 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          // Reduced quality to 0.7 for significantly faster transmission
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
           resolve({ data: dataUrl.split(',')[1], url: dataUrl });
         } else {
@@ -81,24 +94,22 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
     setStatusMessage("Pre-processing for High Accuracy...");
 
     try {
-      // 1. Optimize Image (faster payload)
       const optimized = await optimizeImage(fullDataUrl);
       setPreview(optimized.url);
       
-      // 2. High-frequency status updates for better UX
       let msgIdx = 0;
       const statusInterval = setInterval(() => {
         msgIdx = (msgIdx + 1) % statusMessages.length;
         setStatusMessage(statusMessages[msgIdx]);
-      }, 1000); // Faster transitions (1s)
+      }, 1200);
 
-      // 3. API Call
+      // Trigger the backend API call via apiService/gemini service
       const result = await analyzeMealImage(optimized.data, 'image/jpeg', profile);
       
       clearInterval(statusInterval);
 
       if (!result.isFood) {
-        throw new Error("Scan Failure: Non-consumable item detected. Please scan actual food for metabolic data.");
+        throw new Error("Scan Failure: Non-consumable item detected. Please scan food.");
       }
 
       setAnalysis(result);
@@ -110,7 +121,26 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryUpload = async () => {
+    if (Capacitor.isNativePlatform()) {
+      // Use native photo picker for better UX on mobile
+      try {
+        const image = await Camera.getPhoto({
+          quality: 80,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Photos
+        });
+        if (image.base64String) {
+          await runAnalysisCycle(`data:image/${image.format};base64,${image.base64String}`);
+        }
+      } catch (e) { console.log("Gallery cancelled"); }
+    } else {
+      // Fallback for web testing
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -119,6 +149,8 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
     };
     reader.readAsDataURL(file);
   };
+
+  // --- RENDERING LOGIC (UI stays consistent with MaVita design) ---
 
   if (mode === 'analyzing') {
     return (
@@ -161,14 +193,14 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center shadow-sm hover:border-[#3498DB] transition-all">
+          <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center shadow-sm">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Metabolic Load</p>
             <div className={`text-4xl font-bold ${analysis.glycemicScore > 7 ? 'text-rose-500' : 'text-[#3498DB]'}`}>
               {analysis.glycemicScore}
             </div>
             <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Glycemic Units</p>
           </div>
-          <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center shadow-sm hover:border-[#8CC63F] transition-all">
+          <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center shadow-sm">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Cellular Stress</p>
             <div className="text-4xl font-bold text-[#1F4D54]">
               {analysis.iIndexScore}
@@ -194,13 +226,13 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
         <div className="flex gap-4 pt-6">
           <button 
             onClick={() => { setMode('idle'); setAnalysis(null); setPreview(null); }}
-            className="flex-1 bg-slate-100 py-6 rounded-3xl font-bold text-slate-500 hover:bg-slate-200 active:scale-95 transition-all"
+            className="flex-1 bg-slate-100 py-6 rounded-3xl font-bold text-slate-500 active:scale-95 transition-all"
           >
             Discard
           </button>
           <button 
             onClick={() => onAnalysisComplete({ ...analysis, imageUrl: preview })}
-            className="flex-[2] bg-[#1F4D54] text-white py-6 rounded-3xl font-bold shadow-2xl shadow-teal-100 hover:bg-[#163B41] active:scale-95 transition-all flex items-center justify-center gap-2"
+            className="flex-[2] bg-[#1F4D54] text-white py-6 rounded-3xl font-bold shadow-2xl shadow-teal-100 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             Store Bio-Data <ArrowRight size={20} />
           </button>
@@ -219,24 +251,21 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
       </div>
 
       <div 
-        onClick={() => fileInputRef.current?.click()}
+        onClick={handleGalleryUpload}
         className="w-full aspect-square max-w-[280px] rounded-[3rem] border-4 border-dashed border-[#8CC63F]/40 bg-emerald-50/30 flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-emerald-50 hover:border-[#8CC63F] transition-all relative group"
       >
         <div className="w-24 h-24 rounded-full bg-white shadow-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-          <Camera size={44} className="text-[#3498DB]" />
+          <CameraIcon size={44} className="text-[#3498DB]" />
         </div>
         <p className="text-[#1F4D54] font-bold text-xs tracking-[0.3em] uppercase">Initialize Scan</p>
-        <div className="absolute top-0 right-0 p-4">
-          <div className="w-8 h-8 rounded-full border-2 border-[#8CC63F] border-t-transparent animate-spin opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
       </div>
 
       <div className="w-full max-w-[280px] space-y-3">
         <button 
-           onClick={startCamera}
+           onClick={startNativeCapture}
            className="w-full bg-[#1F4D54] text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-teal-100"
         >
-          <Camera size={20} /> Live Optics Mode
+          <CameraIcon size={20} /> Live Optics Mode
         </button>
       </div>
 
@@ -247,9 +276,8 @@ const MealAnalyzer: React.FC<MealAnalyzerProps> = ({ profile, onAnalysisComplete
         </div>
       )}
 
-      <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-      <canvas ref={canvasRef} className="hidden" />
-      <video ref={videoRef} className="hidden" />
+      {/* Hidden input for web fallback */}
+      <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileInputChange} className="hidden" />
       
       <style>{`
         @keyframes shimmer {
