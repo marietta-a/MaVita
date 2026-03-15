@@ -174,9 +174,9 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
         </h3>
         <div className="space-y-2">
           {[
-            { label: 'CGM Bio-Link', active: true, icon: History },
+            { label: 'CGM Bio-Link', active: false, icon: History },
             { label: 'DNA Sequencing Blueprint', active: false, icon: History },
-            { label: 'Wearable Sync (HRV/Sleep)', active: true, icon: History },
+            { label: 'Wearable Sync (HRV/Sleep)', active: false, icon: History },
           ].map((item, idx) => (
             <button key={idx} className="w-full bg-white p-5 rounded-3xl border border-slate-100 flex justify-between items-center group hover:border-[#3498DB] transition-all shadow-sm">
               <div className="flex items-center gap-3">
@@ -186,7 +186,7 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
                 <span className={`font-bold text-sm ${item.active ? 'text-[#1F4D54]' : 'text-slate-400'}`}>{item.label}</span>
               </div>
               <span className={`text-[10px] font-bold uppercase tracking-widest ${item.active ? 'text-[#8CC63F]' : 'text-slate-300'}`}>
-                {item.active ? 'Syncing' : 'Configure'}
+                {item.active ? 'Syncing' : 'Coming Soon ...'}
               </span>
             </button>
           ))}
