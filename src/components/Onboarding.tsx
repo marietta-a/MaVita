@@ -7,6 +7,7 @@ import {
   PlusCircle, Wind, Baby, Eye, AlertCircle, Globe
 } from 'lucide-react';
 import { Logo } from './Logo';
+import { familyHistories } from '@/constants';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
@@ -183,7 +184,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 <fieldset className="space-y-3">
                   <legend className="block text-sm font-bold text-slate-700 uppercase mb-2">Family History (Check all that apply)</legend>
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Family history selection">
-                    {['Heart Disease', 'Type 2 Diabetes', 'Alzheimer\'s', 'Inflammatory Issues', 'Autoimmune', 'Cancer'].map(item => {
+                    {familyHistories.map(item => {
                       const isSelected = profile.familyHistory?.includes(item);
                       return (
                         <button

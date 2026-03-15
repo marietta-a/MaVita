@@ -1,7 +1,17 @@
-
 import React, { useRef, useState } from 'react';
-import { UserProfile, HealthGoal } from '../../types';
-import { Settings, ShieldCheck, TrendingUp, History, Info, Activity, Camera, Edit2, Save, X } from 'lucide-react';
+import { UserProfile } from '../../types';
+import { 
+  Settings, 
+  TrendingUp, 
+  History, 
+  Info, 
+  Activity, 
+  Camera, 
+  Edit2, 
+  Save, 
+  X 
+} from 'lucide-react';
+import GeneticVulnerabilityEditor from './GeneticVulnerabilityEditor';
 
 interface ProfileProps {
   profile: UserProfile;
@@ -37,15 +47,22 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
     setIsEditing(false);
   };
 
-  const triggerAvatarUpload = () => {
-    fileInputRef.current?.click();
+  const updateVulnerability = (updatedHistory: string[]) => {
+    onUpdateProfile({
+      ...profile,
+      familyHistory: updatedHistory
+    });
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      {/* Profile Card */}
       <div className="flex items-center gap-6 mb-8 bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
         <div className="relative group">
-          <div className="w-24 h-24 rounded-[2rem] bg-emerald-50 flex items-center justify-center border-4 border-white shadow-lg overflow-hidden cursor-pointer" onClick={triggerAvatarUpload}>
+          <div 
+            className="w-24 h-24 rounded-[2rem] bg-emerald-50 flex items-center justify-center border-4 border-white shadow-lg overflow-hidden cursor-pointer" 
+            onClick={() => fileInputRef.current?.click()}
+          >
             <img 
               src={profile.avatarUrl || defaultAvatar} 
               alt="Avatar" 
@@ -55,13 +72,6 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
                <Camera size={24} className="text-white" />
             </div>
           </div>
-          <button 
-            onClick={triggerAvatarUpload}
-            className="absolute -bottom-1 -right-1 bg-[#1F4D54] text-white p-2 rounded-xl shadow-lg border-2 border-white hover:bg-emerald-700 transition-colors"
-            aria-label="Change Avatar"
-          >
-            <Edit2 size={12} />
-          </button>
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -70,6 +80,7 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
             onChange={handleAvatarChange} 
           />
         </div>
+        
         <div className="flex-1">
           {isEditing ? (
             <div className="space-y-3">
@@ -78,23 +89,19 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 className="w-full px-3 py-2 border rounded-xl font-bold text-lg text-[#1F4D54] focus:ring-2 focus:ring-[#3498DB] outline-none"
-                placeholder="Name"
               />
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 uppercase">Age:</span>
-                <input 
-                  type="number" 
-                  value={editAge}
-                  onChange={(e) => setEditAge(parseInt(e.target.value) || 0)}
-                  className="w-20 px-3 py-1 border rounded-xl text-sm font-bold text-slate-700 outline-none"
-                />
-              </div>
+              <input 
+                type="number" 
+                value={editAge}
+                onChange={(e) => setEditAge(parseInt(e.target.value) || 0)}
+                className="w-20 px-3 py-1 border rounded-xl text-sm font-bold text-slate-700 outline-none"
+              />
               <div className="flex gap-2">
-                <button onClick={handleSaveProfile} className="bg-[#8CC63F] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-md">
-                  <Save size={12} /> Save Changes
+                <button onClick={handleSaveProfile} className="bg-[#1F4D54] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-md">
+                  <Save size={12} /> Save
                 </button>
-                <button onClick={() => setIsEditing(false)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                  <X size={12} /> Cancel
+                <button onClick={() => setIsEditing(false)} className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  Cancel
                 </button>
               </div>
             </div>
@@ -102,15 +109,15 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
             <>
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-[#1F4D54] leading-tight">{profile.name}</h2>
-                <button onClick={() => setIsEditing(true)} className="p-2 text-slate-300 hover:text-[#3498DB] transition-colors">
+                <button onClick={() => setIsEditing(true)} className="p-2 text-slate-300 hover:text-[#3498DB]">
                   <Edit2 size={16} />
                 </button>
               </div>
               <div className="flex flex-col gap-1">
-                <p className="text-slate-500 text-sm font-medium">Recorded Age: <span className="text-slate-900 font-bold">{profile.age}</span></p>
+                <p className="text-slate-500 text-sm font-medium">Chronological Age: <span className="text-slate-900 font-bold">{profile.age}</span></p>
                 <div className="flex items-center gap-1 bg-blue-50 w-fit px-2 py-0.5 rounded-full border border-blue-100">
                   <Activity size={10} className="text-[#3498DB]" />
-                  <span className="text-[#3498DB] text-[10px] font-bold uppercase tracking-tighter">Biological Age Estimate: {profile.age - 2}</span>
+                  <span className="text-[#3498DB] text-[10px] font-bold uppercase tracking-tighter">Bio-Age: {profile.age - 2}</span>
                 </div>
               </div>
             </>
@@ -118,23 +125,13 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm">
-          <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-widest">
-            <ShieldCheck size={12} className="text-[#8CC63F]" />
-            Genetic Vulnerability
-          </h4>
-          <div className="space-y-3">
-            {profile.familyHistory.length > 0 ? profile.familyHistory.map((h, idx) => (
-              <div key={idx} className="text-xs font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl flex justify-between items-center">
-                {h}
-                <span className="text-rose-500">Focus</span>
-              </div>
-            )) : (
-              <p className="text-[10px] text-slate-400 italic font-medium">No family risks noted.</p>
-            )}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* STANDALONE COMPONENT */}
+        <GeneticVulnerabilityEditor 
+          selected={profile.familyHistory} 
+          onChange={updateVulnerability} 
+        />
+
         <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm">
           <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-widest">
             <TrendingUp size={12} className="text-[#3498DB]" />
@@ -142,7 +139,7 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
           </h4>
           <div className="flex flex-wrap gap-2">
             {profile.goals.map((g, idx) => (
-              <span key={idx} className="text-[10px] font-bold bg-blue-50 text-[#3498DB] px-3 py-1 rounded-full uppercase tracking-tighter">
+              <span key={idx} className="text-[10px] font-bold bg-blue-50 text-[#3498DB] px-3 py-1.5 rounded-full uppercase tracking-tighter border border-blue-100">
                 {g}
               </span>
             ))}
@@ -168,6 +165,7 @@ const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile }) => {
         <div className="absolute -top-10 -right-10 w-48 h-48 bg-[#8CC63F]/10 rounded-full blur-3xl"></div>
       </div>
 
+      {/* Integrations */}
       <div className="space-y-4 pt-4">
         <h3 className="font-bold text-[#1F4D54] flex items-center gap-2 px-1 uppercase text-xs tracking-widest">
           Bio-Sensing Integrations

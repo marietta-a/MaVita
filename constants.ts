@@ -1,0 +1,1 @@
+export const familyHistories = ['Heart Disease', 'Type 2 Diabetes', 'Alzheimer\'s', 'Inflammatory Issues', 'Autoimmune', 'Cancer'];
