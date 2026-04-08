@@ -14,5 +14,4 @@
 - **MaVita is a "Bio-Engine" for longevity**. It uses Gemini 3 to transform a simple meal photo into a comprehensive biological report. 
 - **Multimodal Meal Analysis:** It recognizes culturally diverse dishes and identifies their specific glycemic impact. 
 - **Metabolic Pathway Mapping:** The app reasons through biochemistry to show how nutrients support functions like Collagen Synthesis or Mitochondrial Biogenesis.
-- **CGM Prediction Intelligence:** By syncing with Continuous Glucose Monitors, it predicts glucose spikes before they happen and offers "Smart Pairing Protocols" to blunt them.
 - **Preventive Priority Map:** Users can toggle focus goals such as Cancer Prevention, Diabetic Health, or Radiant Glow (skin health), and the AI tailors all recommendations to that specific vulnerability.
